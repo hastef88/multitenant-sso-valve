@@ -35,6 +35,8 @@ public class MultiTenantSSOUtils {
     static final String CUSTOM_ACS_HEADER = "CustomACSHeader";
     static final String CUSTOM_REDIRECT_DOMAIN = "CustomRedirectDomainHeader";
 
+    static final String SESSION_COOKIE_NAME = "JSESSIONID";
+
     public static String generateConsumerUrl(Request request, Properties ssoSPConfigProperties) {
 
         String assertionConsumerURL = request.getHeader(ssoSPConfigProperties.getProperty(CUSTOM_ACS_HEADER));
