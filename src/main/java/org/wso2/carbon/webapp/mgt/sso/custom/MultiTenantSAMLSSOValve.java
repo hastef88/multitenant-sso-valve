@@ -229,12 +229,10 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                                         relayState.getRequestParameters());
                             }
 
-
-
                             response.sendRedirect(requestedURI);
                             return;
                         } else {
-                            String redirectUrl = readRedirectPathAfterLogin(request);
+                            String redirectUrl = readRedirectURIAfterLogin(request);
 
                             String tenantName = request.getContext().findParameter(MultiTenantSSOUtils
                                     .ENABLE_SAML2_SSO_WITH_TENANT);
@@ -307,7 +305,7 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                 String relayStateId = SSOAgentUtils.createID();
 
                 RelayState relayState = new RelayState();
-                relayState.setRequestedURL(request.getRequestURI());
+                relayState.setRequestedURL(readRedirectURIAfterLogin(request));
                 relayState.setRequestQueryString(request.getQueryString());
                 relayState.setRequestParameters(request.getParameterMap());
 
@@ -401,30 +399,37 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
     }
 
     /**
-     * This method sets the redirect url after processing the SAML response from the Identity provider (/acs request).
-     * In case of a different domain than the appserver, we will override the redirect url here.
+     * This method sets the redirect uri after processing the SAML response from the Identity provider (/acs request).
+     * In case of a different domain than the appserver, we will override the redirect uri to exclude tenant here.
      * @param request request containing the webapp context information.
      * @return redirect url
      */
-    private String readRedirectPathAfterLogin(Request request) {
+    private String readRedirectURIAfterLogin(Request request) {
+
+        String redirectDomain = request.getHeader(ssoSPConfigProperties.getProperty(MultiTenantSSOUtils
+                .CUSTOM_REDIRECT_DOMAIN));
+
+        if (StringUtils.isBlank(redirectDomain)) {
+            return request.getRequestURI();
+        }
 
         String tenantName = request.getContext().findParameter(MultiTenantSSOUtils.ENABLE_SAML2_SSO_WITH_TENANT);
-        String redirectDomain = null;
-        String redirectUrl;
 
-        if (StringUtils.isBlank(tenantName)) {
-            redirectDomain = tenantDomainMap.get(tenantName);
-        }
+        if (!StringUtils.isBlank(tenantName)) {
 
-        if (!StringUtils.isBlank(redirectDomain)) {
             String tenantComponent = "/t/" + tenantName + "/webapps";
-            redirectUrl = "https://" + redirectDomain + request.getRequestURI().replace(tenantComponent, "");
-        } else {
-            redirectUrl = ssoSPConfigProperties.getProperty
-                    (WebappSSOConstants.APP_SERVER_URL) + request.getContextPath();
-        }
 
-        return redirectUrl;
+            String redirectURI = request.getRequestURI().replace(tenantComponent, "");
+            if (log.isDebugEnabled()) {
+                log.debug("Returning redirect URI : " + redirectURI);
+            }
+            return redirectURI;
+        } else {
+            log.warn("Tenant property " + MultiTenantSSOUtils.ENABLE_SAML2_SSO_WITH_TENANT + " is not configured in " +
+                    "webapp for request : " + request.getRequestURI() + " even though a custom domain is sent in " +
+                    "request header.");
+            return request.getRequestURI();
+        }
     }
 
     /**
