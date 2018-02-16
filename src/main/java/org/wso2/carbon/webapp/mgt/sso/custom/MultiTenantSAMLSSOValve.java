@@ -65,11 +65,8 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
     private static final String ENABLE_SAML2_SSO_WITH_TENANT = "enable.saml2.sso.with.tenant";
     private Properties ssoSPConfigProperties = new Properties();
 
-    private ConcurrentHashMap<String, String> tenantDomainMap;
-
     public MultiTenantSAMLSSOValve() throws IOException {
         log.info("Initializing SAMLSSOValve..");
-        tenantDomainMap = new ConcurrentHashMap<>();
 
         //Read generic SSO ServiceProvider details
         if (SSOUtils.isSSOSPConfigExists()) {
@@ -119,8 +116,6 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                 // Priority to request header identified by SSO-SP-CONFIG Property "CustomACSHeaderName", second the Appserver
                 // property.
                 String acsUrl = MultiTenantSSOUtils.generateConsumerUrl(request, ssoSPConfigProperties);
-
-                cacheRedirectDomain(request);
 
                 //todo remove
 //                acsUrl = SSOUtils.generateConsumerUrl(request.getContextPath(), ssoSPConfigProperties);
@@ -216,25 +211,25 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                             String tenantName = request.getContext().findParameter(MultiTenantSSOUtils
                                     .ENABLE_SAML2_SSO_WITH_TENANT);
 
-                            // If a custom redirect domain is present in request
-                            if (!StringUtils.isBlank(tenantName) && tenantDomainMap.containsKey(tenantName)) {
+                            String tenantDomainName = request.getHeader(ssoSPConfigProperties.getProperty
+                                    (MultiTenantSSOUtils.CUSTOM_REDIRECT_DOMAIN));
 
-                                String tenantDomain = tenantDomainMap.get(tenantName);
+                            // If a custom redirect domain is present in request
+                            if (!StringUtils.isBlank(tenantName) && !StringUtils.isBlank(tenantDomainName)) {
 
                                 String tenantURIComponent = "/t/" + tenantName + "/webapps";
 
-                                redirectUrl = "https://" + tenantDomain + request.getRequestURI()
+                                redirectUrl = "https://" + tenantDomainName + request.getRequestURI()
                                             .replace(tenantURIComponent, "");
 
                                 Cookie sessionCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME,
                                         request.getSession().getId());
-                                sessionCookie.setDomain(tenantDomain);
+                                sessionCookie.setDomain(tenantDomainName);
                                 sessionCookie.setPath("/");
                                 sessionCookie.setSecure(true);
 
                                 if (log.isDebugEnabled()) {
-                                    log.debug("Setting session cookie for custom redirect domain : " +
-                                            tenantDomainMap.get(tenantName));
+                                    log.debug("Setting session cookie for custom redirect domain : " + tenantDomainName);
                                 }
                                 response.addCookie(sessionCookie);
                             }
@@ -301,13 +296,20 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
 
                 RelayState relayState = new RelayState();
 
-//                String redirectDomain = request.getHeader(ssoSPConfigProperties.getProperty(MultiTenantSSOUtils
-//                        .CUSTOM_REDIRECT_DOMAIN));
+                String redirectDomain = request.getHeader(ssoSPConfigProperties.getProperty(MultiTenantSSOUtils
+                        .CUSTOM_REDIRECT_DOMAIN));
 
-//                if (!StringUtils.isBlank(redirectDomain)) {
-//                    relayState.setRequestedURL();
-//                }
-                relayState.setRequestedURL(request.getRequestURI());
+                if (!StringUtils.isBlank(redirectDomain)) {
+                    // Need to hide the tenant from redirection url path.
+                    String tenantName = request.getContext().findParameter(MultiTenantSSOUtils
+                            .ENABLE_SAML2_SSO_WITH_TENANT);
+                    String tenantComponent = "/t/" + tenantName + "/webapps";
+                    if (!StringUtils.isBlank(tenantName)) {
+                        relayState.setRequestedURL(request.getRequestURI().replace(tenantComponent, ""));
+                    }
+                } else {
+                    relayState.setRequestedURL(request.getRequestURI());
+                }
 
                 relayState.setRequestQueryString(request.getQueryString());
                 relayState.setRequestParameters(request.getParameterMap());
@@ -319,10 +321,25 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                     ssoAgentConfig.getSAML2().setPassiveAuthn(false);
                     String htmlPayload = samlSSOManager.buildPostRequest(request, response, false);
                     response.addHeader(HttpHeaders.CONTENT_TYPE, MEDIA_TYPE_TEXT_HTML);
+
+                    if (!StringUtils.isBlank(redirectDomain)) {
+                        Cookie sessionCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME, request.getSession().getId());
+                        sessionCookie.setDomain(redirectDomain);
+                        sessionCookie.setPath("/");
+                        sessionCookie.setSecure(true);
+                        if (log.isDebugEnabled()) {
+                            log.debug("Setting session cookie for custom domain : " + redirectDomain);
+                        }
+                        response.addCookie(sessionCookie);
+                    }
+
                     SSOAgentUtils.sendPostResponse(request, response, htmlPayload);
                     return;
 
                 } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("HTTP Binding not POST.");
+                    }
                     ssoAgentConfig.getSAML2().setPassiveAuthn(false);
                     response.sendRedirect(samlSSOManager.buildRedirectRequest(request, false));
                 }
@@ -410,27 +427,5 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
         }
 
         return redirectPath;
-    }
-
-    /**
-     * In case the redirect domain is different from the application server domain, we are caching it here against the
-     * tenant name.
-     * @param request containing the webapp context information.
-     */
-    private void cacheRedirectDomain(Request request) {
-
-        String tenantName = request.getContext().findParameter(MultiTenantSSOUtils.ENABLE_SAML2_SSO_WITH_TENANT);
-
-        if (!StringUtils.isBlank(tenantName) && !tenantDomainMap.containsKey(tenantName)) {
-            String redirectDomain = request.getHeader(ssoSPConfigProperties.getProperty(MultiTenantSSOUtils
-                    .CUSTOM_REDIRECT_DOMAIN));
-
-            if (!StringUtils.isBlank(redirectDomain)) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Caching redirect domain : " + redirectDomain + " for tenant " + tenantName);
-                }
-                tenantDomainMap.put(tenantName, redirectDomain);
-            }
-        }
     }
 }
