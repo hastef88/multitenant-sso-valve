@@ -49,10 +49,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * SSO Valve to support reading specific SSO configurations (e.g. skipurls, redirect urls) from different
@@ -97,6 +97,23 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
 
         SSOAgentConfig ssoAgentConfig =
                 (SSOAgentConfig) request.getSessionInternal().getNote(WebappSSOConstants.SSO_AGENT_CONFIG);
+
+        if (log.isDebugEnabled()) {
+            Enumeration<String> headers = request.getHeaderNames();
+
+            while (headers.hasMoreElements()) {
+                String headerName = headers.nextElement();
+                log.warn("Request header : " + headerName + " : value : " + request.getHeader(headerName) + " request"
+                        + " hash : " + request.hashCode());
+            }
+
+            if ((request.getCookies() != null) && (request.getCookies().length > 0)) {
+                for (Cookie cookie : request.getCookies()) {
+                    log.warn("Request cookie : " + cookie.getName() + " : value : " + cookie.getValue() + " : domain " +
+                            ": " + cookie.getDomain() + " request hash : " + request.hashCode());
+                }
+            }
+        }
 
         if (ssoAgentConfig == null) {
             try {
@@ -222,22 +239,36 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                                 redirectUrl = "https://" + tenantDomainName + request.getRequestURI()
                                             .replace(tenantURIComponent, "");
 
-                                Cookie sessionCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME,
-                                        request.getSession().getId());
-                                sessionCookie.setDomain(tenantDomainName);
-                                sessionCookie.setPath("/");
-                                sessionCookie.setSecure(true);
+//                                Cookie sessionCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME,
+//                                        request.getSession().getId());
+//                                sessionCookie.setDomain(tenantDomainName);
+//                                sessionCookie.setPath("/");
+//                                sessionCookie.setSecure(true);
+//
+//                                Cookie sessionAppCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME,
+//                                        request.getSession().getId());
+//                                sessionAppCookie.setDomain("appserver.integrateaz.gov");
+//                                sessionAppCookie.setPath("/t/ev.az.gov/");
+//                                sessionAppCookie.setSecure(true);
+//
+//                                if (log.isDebugEnabled()) {
+//                                    log.debug("Setting session cookie for custom redirect domain : " + tenantDomainName);
+//                                }
+//                                response.addCookie(sessionCookie);
+//                                response.addCookie(sessionAppCookie);
 
-                                if (log.isDebugEnabled()) {
-                                    log.debug("Setting session cookie for custom redirect domain : " + tenantDomainName);
-                                }
-                                response.addCookie(sessionCookie);
+//                                log.warn("Redirect Response cookie : " + sessionCookie.getName() + " : value : " +
+//                                        sessionCookie.getValue() + " : domain : " + sessionCookie.getDomain() + " request hash : " + request.hashCode());
                             }
 
 
                             //todo remove
 //                            redirectUrl = ssoSPConfigProperties.getProperty(WebappSSOConstants.APP_SERVER_URL) +
 //                                    request.getContextPath();
+                            if (redirectUrl.endsWith("/acs")) {
+                                log.warn("GOT ACS URL into this !!");
+                                redirectUrl = redirectUrl.substring(0, redirectUrl.length() - 4);
+                            }
                             if (log.isDebugEnabled()) {
                                 log.debug("SETTING redirect URL : " + redirectUrl);
                             }
@@ -305,10 +336,27 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                             .ENABLE_SAML2_SSO_WITH_TENANT);
                     String tenantComponent = "/t/" + tenantName + "/webapps";
                     if (!StringUtils.isBlank(tenantName)) {
-                        relayState.setRequestedURL(request.getRequestURI().replace(tenantComponent, ""));
+                        String relayURI = request.getRequestURI().replace(tenantComponent, "");
+                        if (log.isDebugEnabled()) {
+                            log.debug("Future relay URL : " + relayURI);
+                        }
+                        if (relayURI.endsWith("/acs")) {
+                            log.warn("GOT ACS URL into Relay1 !!");
+                            relayURI = relayURI.substring(0, relayURI.length() - 4);
+                        }
+                        relayState.setRequestedURL(relayURI);
                     }
                 } else {
-                    relayState.setRequestedURL(request.getRequestURI());
+                    if (log.isDebugEnabled()) {
+                        log.debug("NormalRelay URI : " + request.getRequestURI());
+                    }
+                    String relayURI = request.getRequestURI();
+
+                    if (relayURI.endsWith("/acs")) {
+                        log.warn("GOT ACS URL into Relay2 !!");
+                        relayURI = relayURI.substring(0, relayURI.length() - 4);
+                    }
+                    relayState.setRequestedURL(relayURI);
                 }
 
                 relayState.setRequestQueryString(request.getQueryString());
@@ -322,16 +370,26 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
                     String htmlPayload = samlSSOManager.buildPostRequest(request, response, false);
                     response.addHeader(HttpHeaders.CONTENT_TYPE, MEDIA_TYPE_TEXT_HTML);
 
-                    if (!StringUtils.isBlank(redirectDomain)) {
-                        Cookie sessionCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME, request.getSession().getId());
-                        sessionCookie.setDomain(redirectDomain);
-                        sessionCookie.setPath("/");
-                        sessionCookie.setSecure(true);
-                        if (log.isDebugEnabled()) {
-                            log.debug("Setting session cookie for custom domain : " + redirectDomain);
-                        }
-                        response.addCookie(sessionCookie);
-                    }
+//                    if (!StringUtils.isBlank(redirectDomain)) {
+//                        Cookie sessionCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME, request.getSession().getId());
+//                        sessionCookie.setDomain(redirectDomain);
+//                        sessionCookie.setPath("/");
+//                        sessionCookie.setSecure(true);
+//                        if (log.isDebugEnabled()) {
+//                            log.debug("Setting session cookie for custom domain : " + redirectDomain);
+//                        }
+//                        log.warn("Initial Response cookie : " + sessionCookie.getName() + " : value : " +
+//                                sessionCookie.getValue() + " : domain : " + sessionCookie.getDomain() + " request hash : " + request.hashCode());
+//
+//                        Cookie sessionAppserverCookie = new Cookie(MultiTenantSSOUtils.SESSION_COOKIE_NAME, request
+//                                .getSession().getId());
+//                        sessionAppserverCookie.setDomain("appserver.integrateaz.gov");
+//                        sessionAppserverCookie.setPath("/t/ev.az.gov/");
+//                        sessionAppserverCookie.setSecure(true);
+//
+//                        response.addCookie(sessionCookie);
+//                        response.addCookie(sessionAppserverCookie);
+//                    }
 
                     SSOAgentUtils.sendPostResponse(request, response, htmlPayload);
                     return;
@@ -425,6 +483,8 @@ public class MultiTenantSAMLSSOValve extends SingleSignOn {
         if (log.isDebugEnabled()) {
             log.debug("Redirect path = " + redirectPath);
         }
+
+
 
         return redirectPath;
     }

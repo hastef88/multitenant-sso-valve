@@ -69,7 +69,7 @@ public class CustomSSOValve extends SingleSignOn{
     private ConcurrentHashMap<String, String> tenantDomainMap;
 
     public CustomSSOValve() throws IOException {
-        log.info("Initializing MultiTenantSAMLSSOValve.");
+        log.info("Initializing TenantSAMLSSOValve.");
 
         tenantDomainMap = new ConcurrentHashMap<>();
 
@@ -89,7 +89,7 @@ public class CustomSSOValve extends SingleSignOn{
     public void invoke(Request request, Response response) throws IOException, ServletException {
 
         if (log.isDebugEnabled()) {
-            log.debug("Invoking MultiTenantSAMLSSOValve. Request URI : " + request.getRequestURI() + " hash : "
+            log.debug("Invoking TenantSAMLSSOValve. Request URI : " + request.getRequestURI() + " hash : "
                     + request.hashCode());
         }
 
