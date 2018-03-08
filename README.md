@@ -64,7 +64,7 @@ This project is a clone of the default SAMLSSOValve shipped by default with WSO2
  
  1. You will need an Nginx route similar to the following : 
  
- ```yaml
+```yaml
  location /foo/ {
 	proxy_pass https://appserver.com/t/a.com/webapps/foo/; #Route to send the request.
 	proxy_set_header X-ACS-URL "https://custom.mine.com/foo/acs"; # Custom HTTP Header to communicate the ACS url to appserver. 
@@ -73,7 +73,7 @@ This project is a clone of the default SAMLSSOValve shipped by default with WSO2
 	proxy_cookie_domain     appserver.com custom.mine.com; # In order to switch the domain of the cookies in response.
 	proxy_cookie_path       /t/a.com/webapps/foo /foo; # In order to switch the path of the cookies in response.
 }
-      ```
+```
       
   2. Set the custom assertion URL at the identity service provider.
   
