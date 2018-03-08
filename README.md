@@ -64,7 +64,7 @@ This project is a clone of the default SAMLSSOValve shipped by default with WSO2
  
  1. You will need an Nginx route similar to the following : 
  
- ```json
+ ```yaml
       location /foo/ {
 	proxy_pass https://appserver.com/t/a.com/webapps/foo/; #Route to send the request.
 	proxy_set_header X-ACS-URL "https://custom.mine.com/foo/acs"; # Custom HTTP Header to communicate the ACS url to appserver. 
