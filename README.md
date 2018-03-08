@@ -52,10 +52,12 @@ This project is a clone of the default SAMLSSOValve shipped by default with WSO2
  
    This valve honors any URIs configured under the "sso.skip.uris" context property in a web application's web.xml, and skips such URls from the SSO flow. 
    
+   ```xml
    <context-param>
         <param-name>sso.skip.uris</param-name>
         <param-value>/t/a.com/webapps/foo/iamaskipuri</param-value>
    </context-param>
+   ```
 
    
  Other configurations required for the overall scenario to work : 
