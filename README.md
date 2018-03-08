@@ -1,12 +1,12 @@
 # multitenant-sso-valve
 
-Problem : 
+## Problem : 
 
 Lets say your web applications come under a tenant space (a.com). Now, if you are fronting your application with a load balancer (e.g. Nginx) and a custom domain (custom.mine.com), you would not prefer to see the internal application server url at the browser. For example, if you expect your application url to be "custom.mine.com/foo", you would prefer to not show the original url "appserver.com/t/a.com/foo". 
 
 Normally you can get around this problem by configuring a URL rewrite at Nginx. But since the SSO flow is designed to go through a few redirects, you need to fix the problem in a different way. 
 
-High-level Solution : 
+## High-level Solution : 
 
 The ideal SSO flow can be explained in terms of browser navigation as follows (considering WSO2 implementation) : 
 
@@ -32,7 +32,7 @@ The ideal SSO flow can be explained in terms of browser navigation as follows (c
 7.  Request - custom.mine.com/foo/acs ** ACS url + JSESSION cookie since it contains the matching domain and path.
     Response - 302 redirect custom.mine.com/foo
 
-Role of MultiTenantSSOValve : 
+## Role of MultiTenantSSOValve : 
 
 This project is a clone of the default SAMLSSOValve shipped by default with WSO2 Application Server 5.3.0, and provides the following extra capabilities : 
 
@@ -60,19 +60,19 @@ This project is a clone of the default SAMLSSOValve shipped by default with WSO2
    ```
 
    
- Other configurations required for the overall scenario to work : 
+ ## Other configurations required for the overall scenario to work : 
  
  1. You will need an Nginx route similar to the following : 
  
  ```yaml
-      location /foo/ {
+ location /foo/ {
 	proxy_pass https://appserver.com/t/a.com/webapps/foo/; #Route to send the request.
 	proxy_set_header X-ACS-URL "https://custom.mine.com/foo/acs"; # Custom HTTP Header to communicate the ACS url to appserver. 
 	proxy_set_header        X-REDIRECT-DOMAIN "custom.mine.com"; # Custom HTTP Header to communicate the redirect domain to appserver. 
 	proxy_pass_request_headers      on;	# Instruct Nginx to pass above custom headers. 
 	proxy_cookie_domain     appserver.com custom.mine.com; # In order to switch the domain of the cookies in response.
 	proxy_cookie_path       /t/a.com/webapps/foo /foo; # In order to switch the path of the cookies in response.
-      }
+}
       ```
       
   2. Set the custom assertion URL at the identity service provider.
@@ -82,8 +82,3 @@ This project is a clone of the default SAMLSSOValve shipped by default with WSO2
   
  
   
-  
-  
- 
-
-
